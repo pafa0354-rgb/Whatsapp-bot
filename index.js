@@ -1,14 +1,13 @@
 const express = require("express");
 const app = express();
 
-const PORT = process.env.PORT || 8080;
-
+// Railway için zorunlu port
 app.get("/", (req, res) => {
-  res.send("Bot çalışıyor 🚀");
+  res.status(200).send("Bot çalışıyor 🚀");
 });
 
-app.listen(PORT, () => {
-  console.log(`Server ${PORT} portunda çalışıyor`);
+app.listen(process.env.PORT, "0.0.0.0", () => {
+  console.log(`Server ${process.env.PORT} portunda çalışıyor`);
 });
 
 const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys");
