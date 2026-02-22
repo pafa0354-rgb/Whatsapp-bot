@@ -38,4 +38,4 @@ async function startBot() {
   })
 }
 
-startBot()
+startBot().catch(err => console.log(err))
