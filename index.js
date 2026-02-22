@@ -1,3 +1,16 @@
+const express = require("express");
+const app = express();
+
+const PORT = process.env.PORT || 8080;
+
+app.get("/", (req, res) => {
+  res.send("Bot çalışıyor 🚀");
+});
+
+app.listen(PORT, () => {
+  console.log(`Server ${PORT} portunda çalışıyor`);
+});
+
 const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys")
 const P = require("pino")
 const qrcode = require("qrcode-terminal")
@@ -38,8 +51,6 @@ async function startBot() {
     }
   })
 }
-
-startBot().catch(err => console.log(err))
 
 startBot().catch(err => console.log(err))
 
