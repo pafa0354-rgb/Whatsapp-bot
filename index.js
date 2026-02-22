@@ -39,3 +39,14 @@ async function startBot() {
 }
 
 startBot().catch(err => console.log(err))
+
+const express = require("express")
+const app = express()
+
+app.get("/", (req, res) => {
+  res.send("Bot çalışıyor ✅")
+})
+
+app.listen(3000, () => {
+  console.log("Server 3000 portunda çalışıyor")
+})
