@@ -16,8 +16,9 @@ async function startBot() {
     const { connection, qr } = update
 
     if (qr) {
-      qrcode.generate(qr, { small: true })
-    }
+  console.log("QR KODUNU AŞAĞIDAKİ LİNKTE AÇ:")
+  console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${qr}`)
+}
 
     if (connection === "open") {
       console.log("Bot Bağlandı ✅")
