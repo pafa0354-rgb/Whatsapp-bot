@@ -1,54 +1,30 @@
 const express = require("express");
+const { Client, LocalAuth } = require("whatsapp-web.js");
+const qrcode = require("qrcode");
+
 const app = express();
+const port = process.env.PORT || 10000;
 
 app.get("/", (req, res) => {
-  res.status(200).send("Bot çalışıyor 🚀");
+  res.send("Bot çalışıyor 🚀");
 });
 
-const PORT = process.env.PORT;
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server ${PORT} portunda çalışıyor`);
+app.listen(port, () => {
+  console.log(`Server ${port} portunda çalışıyor`);
 });
 
-const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys");
-const P = require("pino");
+const client = new Client({
+  authStrategy: new LocalAuth()
+});
 
-async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState("auth");
+client.on("qr", async (qr) => {
+  console.log("QR KODUNU AŞAĞIDAKİ LİNKTE AÇ:");
+  const qrUrl = await qrcode.toDataURL(qr);
+  console.log(qrUrl);
+});
 
-  const sock = makeWASocket({
-    logger: P({ level: "silent" }),
-    auth: state
-  });
+client.on("ready", () => {
+  console.log("WhatsApp bot hazır ✅");
+});
 
-  sock.ev.on("creds.update", saveCreds);
-
-  sock.ev.on("connection.update", (update) => {
-    const { connection, qr } = update;
-
-    if (qr) {
-      console.log("QR KODUNU AŞAĞIDAKİ LİNKTE AÇ:");
-      console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${qr}`);
-    }
-
-    if (connection === "open") {
-      console.log("Bot Bağlandı ✅");
-    }
-  });
-
-  sock.ev.on("messages.upsert", async ({ messages }) => {
-    const msg = messages[0];
-    if (!msg.message || msg.key.fromMe) return;
-
-    const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
-    const from = msg.key.remoteJid;
-    if (!text) return;
-
-    if (text === "!ping") {
-      await sock.sendMessage(from, { text: "🏓 Pong!" });
-    }
-  });
-}
-
-startBot().catch(err => console.log(err));
+client.initialize();
