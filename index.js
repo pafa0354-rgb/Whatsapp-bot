@@ -47,8 +47,10 @@ const app = express()
 
 app.get("/", (req, res) => {
   res.send("Bot çalışıyor ✅")
-})
+}) 
 
-app.listen(3000, () => {
-  console.log("Server 3000 portunda çalışıyor")
+const PORT = process.env.PORT || 3000
+
+app.listen(PORT, () => {
+  console.log(`Server ${PORT} portunda çalışıyor`)
 })
