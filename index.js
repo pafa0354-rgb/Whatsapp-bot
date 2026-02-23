@@ -1,7 +1,7 @@
 const express = require("express");
 const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys");
 const P = require("pino");
-const qrcode = require("qrcode-terminal");
+const QRCode = require("qrcode");
 
 const app = express();
 const port = process.env.PORT || 10000;
@@ -28,9 +28,10 @@ async function startBot() {
     const { connection, qr } = update;
 
     if (qr) {
-      console.log("QR KODU:");
-      qrcode.generate(qr, { small: true });
-    }
+  QRCode.toDataURL(qr, (err, url) => {
+    console.log("QR LINK:", url);
+  });
+}
 
     if (connection === "open") {
       console.log("WhatsApp bot bağlandı ✅");
