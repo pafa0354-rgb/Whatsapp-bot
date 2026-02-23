@@ -35,7 +35,7 @@ async function startBot() {
 
   // 📌 Pairing Code
   if (!sock.authState.creds.registered) {
-    const code = await sock.requestPairingCode("905XXXXXXXXX"); // NUMARANI YAZ
+    const code = await sock.requestPairingCode("905454649356"); // NUMARANI YAZ
     console.log("PAIRING CODE:", code);
   }
 }
