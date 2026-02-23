@@ -5,7 +5,9 @@ import makeWASocket, {
 import pino from "pino"
 import express from "express"
 import { Boom } from "@hapi/boom"
-import qrcode from "qrcode-terminal"
+import { createRequire } from "module"
+const require = createRequire(import.meta.url)
+const qrcode = require("qrcode-terminal")
 
 const app = express()
 app.get("/", (req, res) => res.send("Bot aktif"))
