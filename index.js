@@ -3,188 +3,133 @@ import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion
 } from "@whiskeysockets/baileys"
+import pino from "pino"
 
-import P from "pino"
-import express from "express"
-import fs from "fs"
-
-const OWNER_NUMBER = "905454649356" // Kendi numaran (90 ile başlasın)
+const ownerNumber = "905454649356" // BURAYA KENDİ NUMARANI YAZ
 
 async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState("auth")
+  const { state, saveCreds } = await useMultiFileAuthState("session")
   const { version } = await fetchLatestBaileysVersion()
 
   const sock = makeWASocket({
     version,
-    logger: P({ level: "silent" }),
+    logger: pino({ level: "silent" }),
     auth: state,
-    printQRInTerminal: false
+    printQRInTerminal: true
   })
 
   sock.ev.on("creds.update", saveCreds)
 
-  sock.ev.on("connection.update", async (update) => {
+  sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect } = update
-
-    if (connection === "connecting") {
-      try {
-        const code = await sock.requestPairingCode(OWNER_NUMBER)
-        console.log("📱 Pairing Code:", code)
-      } catch (err) {
-        console.log("Pairing alınamadı:", err.message)
-      }
-    }
-
-    if (connection === "open") {
-      console.log("✅ WhatsApp Bağlandı")
-    }
-
     if (connection === "close") {
       const shouldReconnect =
         lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
-
-      console.log("❌ Bağlantı kapandı")
-
-      if (shouldReconnect) {
-        console.log("🔄 Yeniden bağlanıyor...")
-        startBot()
-      }
+      if (shouldReconnect) startBot()
+    } else if (connection === "open") {
+      console.log("✅ Bot bağlandı!")
     }
   })
 
-  // ===============================
-  // 📩 MESAJ SİSTEMİ
-  // ===============================
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0]
-    if (!msg.message || msg.key.fromMe) return
+    if (!msg.message) return
 
     const from = msg.key.remoteJid
-    const sender = msg.key.participant || from
-    const isOwner = sender.includes(OWNER_NUMBER)
-
-    const body =
+    const isGroup = from.endsWith("@g.us")
+    const sender = isGroup ? msg.key.participant : from
+    const text =
       msg.message.conversation ||
       msg.message.extendedTextMessage?.text ||
       ""
 
-    const args = body.trim().split(" ")
+    if (!text.startsWith(".")) return
+
+    const args = text.trim().split(" ")
     const command = args[0].toLowerCase()
 
-    // ===============================
-    // 📜 MENÜ
-    // ===============================
-    if (command === "!menu") {
+    // ===== MENU =====
+    if (command === ".menu") {
       await sock.sendMessage(from, {
-        text: `
-🤖 *BOT MENÜ*
+        text: `🔥 BOT MENU 🔥
 
-!menu
-!ping
-!owner
-!info
-!grupbilgi
-!kick
-!tagall
+.menu
+.ping
+.owner
+.tagall (group)
+.kick @etiket (admin)
+.add 90xxxx (admin)
+.promote @etiket (admin)
+.demote @etiket (admin)
 `
       })
     }
 
-    // ===============================
-    // 🏓 PING
-    // ===============================
-    if (command === "!ping") {
+    // ===== PING =====
+    if (command === ".ping") {
       await sock.sendMessage(from, { text: "🏓 Pong!" })
     }
 
-    // ===============================
-    // 👑 OWNER
-    // ===============================
-    if (command === "!owner") {
+    // ===== OWNER =====
+    if (command === ".owner") {
       await sock.sendMessage(from, {
-        text: `👑 Bot Sahibi: wa.me/${OWNER_NUMBER}`
+        text: `👑 Owner: wa.me/${ownerNumber}`
       })
     }
 
-    // ===============================
-    // ℹ️ BOT INFO
-    // ===============================
-    if (command === "!info") {
-      await sock.sendMessage(from, {
-        text: `
-🤖 VIOLENTxARYA WhatsApp Bot
-⚡ Hızlı ve Güçlü
-🚀 7/24 Aktif
-`
-      })
-    }
-
-    // ===============================
-    // 👥 GRUP BİLGİ
-    // ===============================
-    if (command === "!grupbilgi") {
-      if (!from.endsWith("@g.us")) return
-
+    // ===== GROUP FEATURES =====
+    if (isGroup) {
       const metadata = await sock.groupMetadata(from)
+      const admins = metadata.participants
+        .filter(p => p.admin)
+        .map(p => p.id)
 
-      await sock.sendMessage(from, {
-        text: `
-📌 Grup Adı: ${metadata.subject}
-👥 Üye Sayısı: ${metadata.participants.length}
-`
-      })
-    }
+      const isAdmin = admins.includes(sender)
 
-    // ===============================
-    // 🚫 KICK (Owner)
-    // ===============================
-    if (command === "!kick") {
-      if (!from.endsWith("@g.us")) return
-      if (!isOwner) return
+      // TAGALL
+      if (command === ".tagall") {
+        let teks = "📢 Herkes buraya!\n\n"
+        let mentions = []
 
-      const mentioned =
-        msg.message.extendedTextMessage?.contextInfo?.mentionedJid
+        metadata.participants.forEach(p => {
+          teks += `@${p.id.split("@")[0]}\n`
+          mentions.push(p.id)
+        })
 
-      if (!mentioned) return
-
-      await sock.groupParticipantsUpdate(from, mentioned, "remove")
-    }
-
-    // ===============================
-    // 📢 TAGALL (Owner)
-    // ===============================
-    if (command === "!tagall") {
-      if (!from.endsWith("@g.us")) return
-      if (!isOwner) return
-
-      const metadata = await sock.groupMetadata(from)
-      const participants = metadata.participants
-
-      let text = "📢 Herkes buraya!\n\n"
-      let mentions = []
-
-      for (let p of participants) {
-        text += `@${p.id.split("@")[0]}\n`
-        mentions.push(p.id)
+        await sock.sendMessage(from, {
+          text: teks,
+          mentions
+        })
       }
 
-      await sock.sendMessage(from, {
-        text,
-        mentions
-      })
+      // ADMIN KOMUTLARI
+      if (!isAdmin) return
+
+      // KICK
+      if (command === ".kick" && msg.message.extendedTextMessage?.contextInfo?.mentionedJid) {
+        const user = msg.message.extendedTextMessage.contextInfo.mentionedJid
+        await sock.groupParticipantsUpdate(from, user, "remove")
+      }
+
+      // ADD
+      if (command === ".add" && args[1]) {
+        const number = args[1].replace(/[^0-9]/g, "") + "@s.whatsapp.net"
+        await sock.groupParticipantsUpdate(from, [number], "add")
+      }
+
+      // PROMOTE
+      if (command === ".promote" && msg.message.extendedTextMessage?.contextInfo?.mentionedJid) {
+        const user = msg.message.extendedTextMessage.contextInfo.mentionedJid
+        await sock.groupParticipantsUpdate(from, user, "promote")
+      }
+
+      // DEMOTE
+      if (command === ".demote" && msg.message.extendedTextMessage?.contextInfo?.mentionedJid) {
+        const user = msg.message.extendedTextMessage.contextInfo.mentionedJid
+        await sock.groupParticipantsUpdate(from, user, "demote")
+      }
     }
   })
 }
 
 startBot()
-
-// ===============================
-// 🌐 EXPRESS (Railway için)
-// ===============================
-const app = express()
-app.get("/", (req, res) => res.send("Bot çalışıyor"))
-const PORT = process.env.PORT || 3000
-
-app.listen(PORT, () => {
-  console.log("Server çalışıyor:", PORT)
-})
