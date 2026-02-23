@@ -6,8 +6,9 @@ import pino from "pino"
 import express from "express"
 import { Boom } from "@hapi/boom"
 
-const OWNER_NUMBER = "905454649356" // numara + yok, 0 yok
+const OWNER_NUMBER = "905454649356" // + yok, başında 0 yok
 
+// Railway kapanmasın diye basit web server
 const app = express()
 app.get("/", (req, res) => res.send("Bot aktif"))
 app.listen(8080, () => console.log("Server 8080 portunda çalışıyor"))
@@ -23,6 +24,24 @@ async function startBot() {
 
     sock.ev.on("creds.update", saveCreds)
 
+    let pairingRequested = false
+
+    // Pairing Code üretme (428 fixli)
+    if (!state.creds.registered) {
+        sock.ev.on("connection.update", async (update) => {
+            if (update.connection === "connecting" && !pairingRequested) {
+                pairingRequested = true
+                try {
+                    const code = await sock.requestPairingCode(OWNER_NUMBER)
+                    console.log("PAIRING CODE:", code)
+                } catch (err) {
+                    console.log("Pairing hatası:", err.message)
+                }
+            }
+        })
+    }
+
+    // Bağlantı kontrol
     sock.ev.on("connection.update", async (update) => {
         const { connection, lastDisconnect } = update
 
@@ -50,20 +69,6 @@ async function startBot() {
         }
     })
 
-    // ⚠️ BURASI DEĞİŞTİ
-    if (!state.creds.registered) {
-        sock.ev.once("connection.update", async (update) => {
-            if (update.connection === "connecting") {
-                try {
-                    const code = await sock.requestPairingCode(OWNER_NUMBER)
-                    console.log("PAIRING CODE:", code)
-                } catch (err) {
-                    console.log("Pairing hatası:", err.message)
-                }
-            }
-        })
-    }
-
     // Mesaj sistemi
     sock.ev.on("messages.upsert", async (m) => {
         const msg = m.messages[0]
@@ -90,7 +95,11 @@ async function startBot() {
                 await sock.sendMessage(sender, {
                     text:
                         "📌 *Bot Menü*\n\n" +
-                        "!ping\n!menu\n!owner\n!info\n!restart"
+                        "!ping\n" +
+                        "!menu\n" +
+                        "!owner\n" +
+                        "!info\n" +
+                        "!restart"
                 })
                 break
 
@@ -102,22 +111,30 @@ async function startBot() {
 
             case "info":
                 await sock.sendMessage(sender, {
-                    text: "🤖 VIOLENTxARYA WhatsApp Bot\n⚡ Baileys\n🚀 Aktif"
+                    text:
+                        "🤖 VIOLENTxARYA WhatsApp Bot\n" +
+                        "⚡ Hızlı ve Güçlü\n" +
+                        "🚀 Aktif ve çalışıyor"
                 })
                 break
 
             case "restart":
                 if (!isOwner)
                     return sock.sendMessage(sender, {
-                        text: "❌ Sadece owner kullanabilir."
+                        text: "❌ Bu komut sadece owner içindir."
                     })
 
                 await sock.sendMessage(sender, {
-                    text: "♻️ Yeniden başlatılıyor..."
+                    text: "♻️ Bot yeniden başlatılıyor..."
                 })
 
                 process.exit(0)
                 break
+
+            default:
+                await sock.sendMessage(sender, {
+                    text: "❓ Bilinmeyen komut. !menu yaz."
+                })
         }
     })
 }
