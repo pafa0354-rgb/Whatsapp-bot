@@ -183,4 +183,8 @@ startBot()
 // ===============================
 const app = express()
 app.get("/", (req, res) => res.send("Bot çalışıyor"))
-app.listen(8080, () => console.log("Server 8080 portunda çalışıyor"))
+const PORT = process.env.PORT || 3000
+
+app.listen(PORT, () => {
+  console.log("Server çalışıyor:", PORT)
+})
