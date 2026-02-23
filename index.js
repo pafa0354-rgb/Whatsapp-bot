@@ -51,4 +51,6 @@ async function startBot() {
   });
 }
 
-startBot();
+startBot().catch(err => {
+  console.error("Bot başlatılırken hata:", err);
+});
