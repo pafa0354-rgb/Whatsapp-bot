@@ -1,6 +1,7 @@
 const express = require("express");
-const { Client, LocalAuth } = require("whatsapp-web.js");
-const qrcode = require("qrcode");
+const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys");
+const P = require("pino");
+const qrcode = require("qrcode-terminal");
 
 const app = express();
 const port = process.env.PORT || 10000;
@@ -13,34 +14,41 @@ app.listen(port, () => {
   console.log(`Server ${port} portunda çalışıyor`);
 });
 
-const client = new Client({
-  authStrategy: new LocalAuth(),
-  puppeteer: {
-    headless: true,
-    executablePath: "/usr/bin/chromium",
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu"
-    ]
-  }
-});
+async function startBot() {
+  const { state, saveCreds } = await useMultiFileAuthState("auth");
 
-client.on("qr", async (qr) => {
-  console.log("QR KODUNU AŞAĞIDAKİ LİNKTE AÇ:");
-  const qrUrl = await qrcode.toDataURL(qr);
-  console.log(qrUrl);
-});
+  const sock = makeWASocket({
+    logger: P({ level: "silent" }),
+    auth: state
+  });
 
-client.on("ready", () => {
-  console.log("WhatsApp bot hazır ✅");
-});
+  sock.ev.on("creds.update", saveCreds);
 
-client.on("message", async (message) => {
-  if (message.body === "!ping") {
-    message.reply("🏓 Pong!");
-  }
-});
+  sock.ev.on("connection.update", (update) => {
+    const { connection, qr } = update;
 
-client.initialize();
+    if (qr) {
+      console.log("QR KODU:");
+      qrcode.generate(qr, { small: true });
+    }
+
+    if (connection === "open") {
+      console.log("WhatsApp bot bağlandı ✅");
+    }
+  });
+
+  sock.ev.on("messages.upsert", async ({ messages }) => {
+    const msg = messages[0];
+    if (!msg.message || msg.key.fromMe) return;
+
+    const text =
+      msg.message.conversation ||
+      msg.message.extendedTextMessage?.text;
+
+    if (text === "!ping") {
+      await sock.sendMessage(msg.key.remoteJid, { text: "🏓 Pong!" });
+    }
+  });
+}
+
+startBot();
