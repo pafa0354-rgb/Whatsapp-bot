@@ -1,5 +1,6 @@
 const makeWASocket = require("@whiskeysockets/baileys").default;
 const { useMultiFileAuthState, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
+const OWNER_NUMBER = "905454649356";
 const P = require("pino");
 const express = require("express");
 
