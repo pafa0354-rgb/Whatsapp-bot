@@ -5,10 +5,8 @@ import makeWASocket, {
 import pino from "pino"
 import express from "express"
 import { Boom } from "@hapi/boom"
+import qrcode from "qrcode-terminal"
 
-const OWNER_NUMBER = "905454649356" // + yok, başında 0 yok
-
-// Railway kapanmasın diye basit web server
 const app = express()
 app.get("/", (req, res) => res.send("Bot aktif"))
 app.listen(8080, () => console.log("Server 8080 portunda çalışıyor"))
@@ -24,29 +22,12 @@ async function startBot() {
 
     sock.ev.on("creds.update", saveCreds)
 
-    let pairingRequested = false
-
-    // Pairing Code üretme (428 fixli)
-    if (!state.creds.registered) {
-        sock.ev.on("connection.update", async (update) => {
-            if (update.connection === "connecting" && !pairingRequested) {
-                pairingRequested = true
-                try {
-                    const code = await sock.requestPairingCode(OWNER_NUMBER)
-                    console.log("PAIRING CODE:", code)
-                } catch (err) {
-                    console.log("Pairing hatası:", err.message)
-                }
-            }
-        })
-    }
-
-    // Bağlantı kontrol
     sock.ev.on("connection.update", async (update) => {
-        const { connection, lastDisconnect } = update
+        const { connection, qr, lastDisconnect } = update
 
-        if (connection === "connecting") {
-            console.log("WhatsApp bağlanıyor...")
+        if (qr) {
+            console.log("QR KODU OKUT 👇")
+            qrcode.generate(qr, { small: true })
         }
 
         if (connection === "open") {
@@ -63,85 +44,13 @@ async function startBot() {
             if (shouldReconnect) {
                 console.log("🔄 Yeniden bağlanıyor...")
                 startBot()
-            } else {
-                console.log("🚪 Oturum kapatıldı.")
             }
-        }
-    })
-
-    // Mesaj sistemi
-    sock.ev.on("messages.upsert", async (m) => {
-        const msg = m.messages[0]
-        if (!msg.message) return
-
-        const sender = msg.key.remoteJid
-        const isOwner = sender.includes(OWNER_NUMBER)
-
-        const text =
-            msg.message.conversation ||
-            msg.message.extendedTextMessage?.text ||
-            ""
-
-        if (!text.startsWith("!")) return
-
-        const command = text.slice(1).split(" ")[0].toLowerCase()
-
-        switch (command) {
-            case "ping":
-                await sock.sendMessage(sender, { text: "🏓 Pong!" })
-                break
-
-            case "menu":
-                await sock.sendMessage(sender, {
-                    text:
-                        "📌 *Bot Menü*\n\n" +
-                        "!ping\n" +
-                        "!menu\n" +
-                        "!owner\n" +
-                        "!info\n" +
-                        "!restart"
-                })
-                break
-
-            case "owner":
-                await sock.sendMessage(sender, {
-                    text: "👑 Owner: +" + OWNER_NUMBER
-                })
-                break
-
-            case "info":
-                await sock.sendMessage(sender, {
-                    text:
-                        "🤖 VIOLENTxARYA WhatsApp Bot\n" +
-                        "⚡ Hızlı ve Güçlü\n" +
-                        "🚀 Aktif ve çalışıyor"
-                })
-                break
-
-            case "restart":
-                if (!isOwner)
-                    return sock.sendMessage(sender, {
-                        text: "❌ Bu komut sadece owner içindir."
-                    })
-
-                await sock.sendMessage(sender, {
-                    text: "♻️ Bot yeniden başlatılıyor..."
-                })
-
-                process.exit(0)
-                break
-
-            default:
-                await sock.sendMessage(sender, {
-                    text: "❓ Bilinmeyen komut. !menu yaz."
-                })
         }
     })
 }
 
 startBot()
 
-// Railway kapanmasın
 setInterval(() => {
     console.log("Bot aktif...")
 }, 30000)
