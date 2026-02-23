@@ -18,25 +18,32 @@ async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("/tmp/auth");
 
   const sock = makeWASocket({
-    logger: P({ level: "info" }),
-    auth: state
+    logger: P({ level: "silent" }),
+    auth: state,
+    printQRInTerminal: false
   });
 
   sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("connection.update", (update) => {
-    const { connection, qr } = update;
-
-    if (qr) {
-  QRCode.toDataURL(qr, (err, url) => {
-    console.log("QR LINK:", url);
-  });
-}
+  sock.ev.on("connection.update", async (update) => {
+    const { connection, lastDisconnect } = update;
 
     if (connection === "open") {
       console.log("WhatsApp bot bağlandı ✅");
     }
+
+    if (connection === "close") {
+      console.log("Bağlantı kapandı, yeniden bağlanıyor...");
+      startBot();
+    }
   });
+
+  // 📌 PAIRING CODE
+  if (!sock.authState.creds.registered) {
+    const code = await sock.requestPairingCode("905454649356"); 
+    console.log("PAIRING CODE:", code);
+  }
+}
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
